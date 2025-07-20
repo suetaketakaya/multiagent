@@ -423,6 +423,52 @@ class TechnicalAnalystWorker(BaseAgent):
                 priority="高"
             )
 
+class UXDesignWorker(BaseAgent):
+    async def evaluate(self, target_info: Dict[str, Any]) -> AgentResult:
+        prompt = self.create_prompt(target_info)
+        
+        try:
+            response = await self.client.generate_response(
+                model=self.model,
+                prompt=prompt,
+                system_prompt=self.system_prompt,
+                temperature=self.temperature
+            )
+            
+            return self._parse_worker_response(response)
+        except Exception as e:
+            return AgentResult(
+                agent_name=self.name,
+                role=self.role,
+                evaluation=f"評価中にエラーが発生しました: {str(e)}",
+                recommendations=["システムエラーのため評価を再実行してください", f"エラー詳細: {str(e)}"],
+                risk_level="不明",
+                priority="高"
+            )
+
+class SecurityAuditWorker(BaseAgent):
+    async def evaluate(self, target_info: Dict[str, Any]) -> AgentResult:
+        prompt = self.create_prompt(target_info)
+        
+        try:
+            response = await self.client.generate_response(
+                model=self.model,
+                prompt=prompt,
+                system_prompt=self.system_prompt,
+                temperature=self.temperature
+            )
+            
+            return self._parse_worker_response(response)
+        except Exception as e:
+            return AgentResult(
+                agent_name=self.name,
+                role=self.role,
+                evaluation=f"評価中にエラーが発生しました: {str(e)}",
+                recommendations=["システムエラーのため評価を再実行してください", f"エラー詳細: {str(e)}"],
+                risk_level="不明",
+                priority="高"
+            )
+
 def create_agent(config: AgentConfig, ollama_client: OllamaClient) -> BaseAgent:
     """エージェント設定に基づいて適切なエージェントインスタンスを作成"""
     if "BOSS" in config.name:
@@ -433,5 +479,9 @@ def create_agent(config: AgentConfig, ollama_client: OllamaClient) -> BaseAgent:
         return ManagementRequirementsWorker(config, ollama_client)
     elif "Technical" in config.name:
         return TechnicalAnalystWorker(config, ollama_client)
+    elif "UX_Design" in config.name:
+        return UXDesignWorker(config, ollama_client)
+    elif "Security_Audit" in config.name:
+        return SecurityAuditWorker(config, ollama_client)
     else:
         return BaseAgent(config, ollama_client) 

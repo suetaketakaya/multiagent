@@ -167,28 +167,95 @@ def show_config():
 @app.command()
 def show_structure():
     """システム構造を表示"""
-    console.print(Panel.fit(
-        f"[bold]BOSS-Workerシステム構造[/bold]\n\n"
-        f"👑 BOSS: {BOSS_CONFIG.name}\n"
-        f"   ↓ 統合・判定\n"
-        f"🔧 Workers:\n" +
-        "\n".join([
-            f"   • {worker.name} ({worker.role})"
-            for worker in WORKER_CONFIGS
-        ]) + "\n\n"
-        f"[bold]処理フロー:[/bold]\n"
-        f"1. Workerエージェントが並行して専門評価を実行\n"
-        f"2. Workerエージェント間で会話・協調\n"
-        f"3. BOSSエージェントが結果を統合・分析\n"
-        f"4. 最終判定と改善ロードマップを生成\n\n"
-        f"[bold]会話タイプ:[/bold]\n"
-        f"• ❓ 質問: 専門分野間の情報交換\n"
-        f"• 💬 回答: 質問への専門的回答\n"
-        f"• 🤝 協力: 共同改善提案の検討\n"
-        f"• ⚖️ 議論: 異なる観点の建設的議論",
-        title="システム構造",
-        border_style="green"
-    ))
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    
+    console = Console()
+    
+    # システム構造の説明
+    structure_text = Text()
+    structure_text.append("🏗️ BOSS-Workerマルチエージェントシステム構造\n\n", style="bold blue")
+    
+    structure_text.append("👑 BOSSエージェント\n", style="bold yellow")
+    structure_text.append("   • BOSS_Agent (プロジェクト統括・品質保証マネージャー)\n", style="yellow")
+    structure_text.append("   • 役割: Worker結果統合、最終判定、改善ロードマップ策定\n\n", style="dim")
+    
+    structure_text.append("🔧 Workerエージェント群\n", style="bold green")
+    structure_text.append("   • ISTQB_Compliance_Worker (ISTQB準拠・法規制コンプライアンス確認者)\n", style="green")
+    structure_text.append("   • Management_Requirements_Worker (マネジメント・顧客要件確認者)\n", style="green")
+    structure_text.append("   • Technical_Analyst_Worker (テストアナリスト・技術者視点評価者)\n", style="green")
+    structure_text.append("   • UX_Design_Worker (UX/UI設計・ユーザビリティ評価者)\n", style="green")
+    structure_text.append("   • Security_Audit_Worker (セキュリティ監査・脆弱性評価者)\n\n", style="green")
+    
+    structure_text.append("🔄 処理フロー\n", style="bold magenta")
+    structure_text.append("   Step 1: Workerエージェント並行評価\n", style="magenta")
+    structure_text.append("   Step 1.5: Workerエージェント間会話・協調\n", style="magenta")
+    structure_text.append("   Step 2: BOSSエージェント統合評価\n", style="magenta")
+    structure_text.append("   Step 3: 最終判定・改善ロードマップ生成\n\n", style="magenta")
+    
+    structure_text.append("💬 会話タイプ\n", style="bold cyan")
+    structure_text.append("   • ❓ 質問: 専門分野間の情報交換\n", style="cyan")
+    structure_text.append("   • 💬 回答: 質問への専門的回答\n", style="cyan")
+    structure_text.append("   • 🤝 協力: 共同改善提案の検討\n", style="cyan")
+    structure_text.append("   • ⚖️ 議論: 異なる観点の建設的議論\n", style="cyan")
+    
+    panel = Panel(structure_text, title="システム構造", border_style="blue")
+    console.print(panel)
+    
+    # エージェント詳細テーブル
+    table = Table(title="エージェント詳細", show_header=True, header_style="bold magenta")
+    table.add_column("エージェント名", style="cyan", no_wrap=True)
+    table.add_column("役割", style="green")
+    table.add_column("使用モデル", style="yellow")
+    table.add_column("専門分野", style="blue")
+    
+    # BOSSエージェント
+    table.add_row(
+        "BOSS_Agent",
+        "プロジェクト統括・品質保証マネージャー",
+        "pakachan/elyza-llama3-8b:latest",
+        "統合評価・最終判定・改善ロードマップ"
+    )
+    
+    # Workerエージェント
+    table.add_row(
+        "ISTQB_Compliance_Worker",
+        "ISTQB準拠・法規制コンプライアンス確認者",
+        "pakachan/elyza-llama3-8b:latest",
+        "PCI DSS・個人情報保護法・特定商取引法"
+    )
+    
+    table.add_row(
+        "Management_Requirements_Worker",
+        "マネジメント・顧客要件確認者",
+        "gemma3:latest",
+        "ビジネスモデル・市場適合性・ROI分析"
+    )
+    
+    table.add_row(
+        "Technical_Analyst_Worker",
+        "テストアナリスト・技術者視点評価者",
+        "llama3.2:latest",
+        "アーキテクチャ・パフォーマンス・技術的品質"
+    )
+    
+    table.add_row(
+        "UX_Design_Worker",
+        "UX/UI設計・ユーザビリティ評価者",
+        "gemma3:latest",
+        "ユーザビリティ・アクセシビリティ・UI/UX設計"
+    )
+    
+    table.add_row(
+        "Security_Audit_Worker",
+        "セキュリティ監査・脆弱性評価者",
+        "pakachan/elyza-llama3-8b:latest",
+        "認証・暗号化・入力検証・APIセキュリティ"
+    )
+    
+    console.print(table)
 
 @app.command()
 def preview_conversations():
