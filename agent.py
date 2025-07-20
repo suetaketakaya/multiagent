@@ -23,6 +23,14 @@ class BossResult:
     improvement_roadmap: List[str]
     worker_summary: Dict[str, Any]
 
+@dataclass
+class WorkerConversation:
+    from_agent: str
+    to_agent: str
+    message: str
+    timestamp: str
+    conversation_type: str  # "question", "answer", "collaboration", "dispute"
+
 class BaseAgent:
     def __init__(self, config: AgentConfig, ollama_client: OllamaClient):
         self.config = config
@@ -32,6 +40,7 @@ class BaseAgent:
         self.model = config.model
         self.system_prompt = config.system_prompt
         self.temperature = config.temperature
+        self.conversation_history = []
     
     async def evaluate(self, target_info: Dict[str, Any]) -> AgentResult:
         """エージェント固有の評価を実行"""
@@ -113,6 +122,95 @@ class BaseAgent:
             risk_level=risk_level,
             priority=priority
         )
+
+    async def communicate_with_worker(self, other_worker: 'BaseAgent', target_info: Dict[str, Any], conversation_type: str) -> WorkerConversation:
+        """他のWorkerエージェントとの会話を実行"""
+        from datetime import datetime
+        
+        conversation_prompt = self._create_conversation_prompt(other_worker, target_info, conversation_type)
+        
+        try:
+            response = await self.client.generate_response(
+                model=self.model,
+                prompt=conversation_prompt,
+                system_prompt=self.system_prompt,
+                temperature=self.temperature
+            )
+            
+            conversation = WorkerConversation(
+                from_agent=self.name,
+                to_agent=other_worker.name,
+                message=response,
+                timestamp=datetime.now().isoformat(),
+                conversation_type=conversation_type
+            )
+            
+            self.conversation_history.append(conversation)
+            return conversation
+            
+        except Exception as e:
+            return WorkerConversation(
+                from_agent=self.name,
+                to_agent=other_worker.name,
+                message=f"会話中にエラーが発生しました: {str(e)}",
+                timestamp=datetime.now().isoformat(),
+                conversation_type=conversation_type
+            )
+
+    def _create_conversation_prompt(self, other_worker: 'BaseAgent', target_info: Dict[str, Any], conversation_type: str) -> str:
+        """会話用のプロンプトを作成"""
+        
+        if conversation_type == "question":
+            return f"""あなたは{self.role}です。
+他のWorkerエージェント「{other_worker.name}」に質問をしてください。
+
+対象アプリケーション: {target_info.get('url', 'N/A')}
+概要: {target_info.get('description', 'N/A')}
+
+あなたの専門分野: {self.role}
+相手の専門分野: {other_worker.role}
+
+あなたの専門分野に関連して、相手の専門分野について質問してください。
+質問は具体的で建設的であるべきです。"""
+        
+        elif conversation_type == "answer":
+            return f"""あなたは{self.role}です。
+他のWorkerエージェント「{other_worker.name}」からの質問に回答してください。
+
+対象アプリケーション: {target_info.get('url', 'N/A')}
+概要: {target_info.get('description', 'N/A')}
+
+あなたの専門分野: {self.role}
+相手の専門分野: {other_worker.role}
+
+相手の質問に対して、あなたの専門分野の観点から回答してください。
+回答は具体的で実用的であるべきです。"""
+        
+        elif conversation_type == "collaboration":
+            return f"""あなたは{self.role}です。
+他のWorkerエージェント「{other_worker.name}」と協力して改善提案を検討してください。
+
+対象アプリケーション: {target_info.get('url', 'N/A')}
+概要: {target_info.get('description', 'N/A')}
+
+あなたの専門分野: {self.role}
+相手の専門分野: {other_worker.role}
+
+両方の専門分野を組み合わせた改善提案を検討してください。
+協力的で建設的な提案をしてください。"""
+        
+        else:  # dispute
+            return f"""あなたは{self.role}です。
+他のWorkerエージェント「{other_worker.name}」と異なる観点について議論してください。
+
+対象アプリケーション: {target_info.get('url', 'N/A')}
+概要: {target_info.get('description', 'N/A')}
+
+あなたの専門分野: {self.role}
+相手の専門分野: {other_worker.role}
+
+あなたの専門分野の観点から、相手の提案について異なる意見や懸念を述べてください。
+建設的な議論を心がけてください。"""
 
 class BossAgent(BaseAgent):
     async def evaluate_workers(self, worker_results: List[AgentResult], target_info: Dict[str, Any]) -> BossResult:

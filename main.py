@@ -40,6 +40,11 @@ def run(
         "--output",
         "-o",
         help="出力ファイル名（指定しない場合は自動生成）"
+    ),
+    show_conversations: bool = typer.Option(
+        True,
+        "--conversations/--no-conversations",
+        help="Worker間の会話をリアルタイムで表示するかどうか"
     )
 ):
     """BOSS-Workerマルチエージェントシステムを実行してeコマースアプリケーションを評価"""
@@ -75,6 +80,7 @@ def run(
         console.print(f"Worker: {len(WORKER_CONFIGS)}名")
         for worker in WORKER_CONFIGS:
             console.print(f"  • {worker.name} ({worker.model})")
+        console.print(f"会話表示: {'有効' if show_conversations else '無効'}")
         
         if not Confirm.ask("評価を開始しますか？"):
             console.print("[yellow]評価をキャンセルしました[/yellow]")
@@ -172,10 +178,32 @@ def show_structure():
         ]) + "\n\n"
         f"[bold]処理フロー:[/bold]\n"
         f"1. Workerエージェントが並行して専門評価を実行\n"
-        f"2. BOSSエージェントが結果を統合・分析\n"
-        f"3. 最終判定と改善ロードマップを生成",
+        f"2. Workerエージェント間で会話・協調\n"
+        f"3. BOSSエージェントが結果を統合・分析\n"
+        f"4. 最終判定と改善ロードマップを生成\n\n"
+        f"[bold]会話タイプ:[/bold]\n"
+        f"• ❓ 質問: 専門分野間の情報交換\n"
+        f"• 💬 回答: 質問への専門的回答\n"
+        f"• 🤝 協力: 共同改善提案の検討\n"
+        f"• ⚖️ 議論: 異なる観点の建設的議論",
         title="システム構造",
         border_style="green"
+    ))
+
+@app.command()
+def preview_conversations():
+    """Worker間の会話プレビューを表示"""
+    console.print(Panel.fit(
+        "[bold]Worker間会話プレビュー[/bold]\n\n"
+        "この機能では、Workerエージェント間の以下の会話が表示されます：\n\n"
+        "❓ 質問: 専門分野間の情報交換\n"
+        "💬 回答: 質問への専門的回答\n"
+        "🤝 協力: 共同改善提案の検討\n"
+        "⚖️ 議論: 異なる観点の建設的議論\n\n"
+        "会話はリアルタイムで表示され、各Workerの専門性を活かした\n"
+        "建設的な議論が行われます。",
+        title="会話プレビュー機能",
+        border_style="cyan"
     ))
 
 if __name__ == "__main__":

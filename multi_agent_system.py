@@ -9,7 +9,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from config import config, BOSS_CONFIG, WORKER_CONFIGS
 from ollama_client import OllamaClient
-from agent import create_agent, AgentResult, BossResult
+from agent import create_agent, AgentResult, BossResult, WorkerConversation
 
 console = Console()
 
@@ -20,6 +20,7 @@ class MultiAgentSystem:
         self.worker_agents = []
         self.worker_results = []
         self.boss_result = None
+        self.worker_conversations = []
         
         # BOSSエージェントを初期化
         self.boss_agent = create_agent(BOSS_CONFIG, self.ollama_client)
@@ -50,6 +51,10 @@ class MultiAgentSystem:
         if not worker_results:
             console.print("[red]❌ Workerエージェントの評価が失敗しました[/red]")
             return None
+        
+        # Step 1.5: Workerエージェント間の会話
+        console.print("\n[bold]💬 Step 1.5: Workerエージェント間の会話[/bold]")
+        await self._run_worker_conversations(target_info)
         
         # Step 2: BOSSエージェントによる統合評価
         console.print("\n[bold]👑 Step 2: BOSSエージェントによる統合評価[/bold]")
@@ -86,6 +91,57 @@ class MultiAgentSystem:
         
         return worker_results
     
+    async def _run_worker_conversations(self, target_info: Dict[str, Any]):
+        """Workerエージェント間の会話を実行"""
+        conversation_types = ["question", "answer", "collaboration", "dispute"]
+        
+        # 各Workerペアで会話を実行
+        for i, worker1 in enumerate(self.worker_agents):
+            for j, worker2 in enumerate(self.worker_agents):
+                if i != j:  # 自分自身とは会話しない
+                    for conv_type in conversation_types:
+                        try:
+                            conversation = await worker1.communicate_with_worker(
+                                worker2, target_info, conv_type
+                            )
+                            self.worker_conversations.append(conversation)
+                            
+                            # 会話をリアルタイムで表示
+                            self._display_conversation(conversation)
+                            
+                            # 会話間の短い待機
+                            await asyncio.sleep(1)
+                            
+                        except Exception as e:
+                            console.print(f"[red]会話エラー ({worker1.name} → {worker2.name}): {e}[/red]")
+    
+    def _display_conversation(self, conversation: WorkerConversation):
+        """会話を表示"""
+        conv_type_icons = {
+            "question": "❓",
+            "answer": "💬",
+            "collaboration": "🤝",
+            "dispute": "⚖️"
+        }
+        
+        icon = conv_type_icons.get(conversation.conversation_type, "💬")
+        conv_type_names = {
+            "question": "質問",
+            "answer": "回答",
+            "collaboration": "協力",
+            "dispute": "議論"
+        }
+        
+        conv_type_name = conv_type_names.get(conversation.conversation_type, "会話")
+        
+        console.print(Panel(
+            f"[bold]{conversation.from_agent}[/bold] → [bold]{conversation.to_agent}[/bold]\n"
+            f"[yellow]{conv_type_name}[/yellow] {icon}\n\n"
+            f"{conversation.message}",
+            title=f"Worker会話: {conversation.from_agent} → {conversation.to_agent}",
+            border_style="cyan"
+        ))
+    
     async def _run_boss_evaluation(self, worker_results: List[AgentResult], target_info: Dict[str, Any]) -> BossResult:
         """BOSSエージェントによる統合評価を実行"""
         try:
@@ -94,6 +150,37 @@ class MultiAgentSystem:
         except Exception as e:
             console.print(f"[red]BOSSエージェントでエラー: {e}[/red]")
             return None
+    
+    def display_conversation_summary(self):
+        """会話サマリーを表示"""
+        if not self.worker_conversations:
+            console.print("[yellow]Worker間の会話はありません[/yellow]")
+            return
+        
+        console.print(Panel.fit(
+            f"[bold]Worker会話サマリー[/bold]\n"
+            f"総会話数: {len(self.worker_conversations)}\n"
+            f"参加Worker: {len(self.worker_agents)}名",
+            title="会話統計",
+            border_style="green"
+        ))
+        
+        # 会話タイプ別の統計
+        conv_type_counts = {}
+        for conv in self.worker_conversations:
+            conv_type = conv.conversation_type
+            conv_type_counts[conv_type] = conv_type_counts.get(conv_type, 0) + 1
+        
+        conv_type_names = {
+            "question": "質問",
+            "answer": "回答", 
+            "collaboration": "協力",
+            "dispute": "議論"
+        }
+        
+        for conv_type, count in conv_type_counts.items():
+            name = conv_type_names.get(conv_type, conv_type)
+            console.print(f"• {name}: {count}回")
     
     def generate_report(self) -> Dict[str, Any]:
         """評価結果から統合レポートを生成"""
@@ -159,6 +246,16 @@ class MultiAgentSystem:
                 }
                 for result in self.worker_results
             ],
+            "worker_conversations": [
+                {
+                    "from_agent": conv.from_agent,
+                    "to_agent": conv.to_agent,
+                    "message": conv.message,
+                    "timestamp": conv.timestamp,
+                    "conversation_type": conv.conversation_type
+                }
+                for conv in self.worker_conversations
+            ],
             "issues_by_priority": {
                 "high": [{"agent": r.agent_name, "recommendations": r.recommendations} for r in high_priority_workers],
                 "medium": [{"agent": r.agent_name, "recommendations": r.recommendations} for r in medium_priority_workers],
@@ -220,6 +317,9 @@ class MultiAgentSystem:
                     title=f"Worker: {result.agent_name}",
                     border_style="blue"
                 ))
+        
+        # 会話サマリーの表示
+        self.display_conversation_summary()
     
     def save_report(self, filename: str = None):
         """レポートをJSONファイルに保存"""
